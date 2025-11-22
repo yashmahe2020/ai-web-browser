@@ -596,6 +596,9 @@ const recordingAPI: FlowRecordingAPI = {
   },
   onRecordingStateChanged: (callback: (isRecording: boolean) => void) => {
     return listenOnIPCChannel("recording:on-state-changed", callback);
+  },
+  onEventCaptured: (callback: (event: Omit<RecordedEvent, "id" | "timestamp">) => void) => {
+    return listenOnIPCChannel("recording:on-event-captured", callback);
   }
 };
 

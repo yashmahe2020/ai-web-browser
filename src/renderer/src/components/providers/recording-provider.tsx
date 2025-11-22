@@ -39,9 +39,20 @@ export const RecordingProvider = ({ children }: RecordingProviderProps) => {
   }, []);
 
   useEffect(() => {
-    // Recording state changes are polled by content scripts via isRecording()
-    // No need to broadcast state changes explicitly
-  }, [state.isRecording]);
+    // Listen for DOM events captured from content scripts
+    if (typeof window !== "undefined" && window.flow?.recording?.onEventCaptured) {
+      const unsubscribe = window.flow.recording.onEventCaptured((event) => {
+        // Add the event to the recorder
+        recorder.addEvent(event);
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+
+    return undefined;
+  }, []);
 
   const toggleRecording = () => {
     recorder.toggleRecording();
