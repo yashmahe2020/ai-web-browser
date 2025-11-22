@@ -35,6 +35,8 @@ import { FlowTabsAPI } from "~/flow/interfaces/browser/tabs";
 import { FlowUpdatesAPI } from "~/flow/interfaces/app/updates";
 import { FlowActionsAPI } from "~/flow/interfaces/app/actions";
 import { FlowShortcutsAPI, ShortcutsData } from "~/flow/interfaces/app/shortcuts";
+import { FlowRecordingAPI } from "~/flow/interfaces/browser/recording";
+import type { RecordedEvent } from "~/types/recording";
 
 // API CHECKS //
 function isProtocol(protocol: string) {
@@ -581,6 +583,22 @@ const shortcutsAPI: FlowShortcutsAPI = {
   }
 };
 
+// RECORDING API //
+const recordingAPI: FlowRecordingAPI = {
+  isRecording: async () => {
+    return ipcRenderer.invoke("recording:is-recording");
+  },
+  exportRecording: async (sessionData: string) => {
+    return ipcRenderer.invoke("recording:export", sessionData);
+  },
+  captureEvent: (event: Omit<RecordedEvent, "id" | "timestamp">) => {
+    return ipcRenderer.send("recording:capture-event", event);
+  },
+  onRecordingStateChanged: (callback: (isRecording: boolean) => void) => {
+    return listenOnIPCChannel("recording:on-state-changed", callback);
+  }
+};
+
 // EXPOSE FLOW API //
 const flowAPI: typeof flow = {
   // App APIs
@@ -607,6 +625,9 @@ const flowAPI: typeof flow = {
   }),
   omnibox: wrapAPI(omniboxAPI, "browser"),
   newTab: wrapAPI(newTabAPI, "browser"),
+  recording: wrapAPI(recordingAPI, "browser", {
+    captureEvent: "all" // Allow content scripts to capture events
+  }),
 
   // Session APIs
   profiles: wrapAPI(profilesAPI, "session", {
@@ -623,3 +644,129 @@ const flowAPI: typeof flow = {
   onboarding: wrapAPI(onboardingAPI, "settings")
 };
 contextBridge.exposeInMainWorld("flow", flowAPI);
+
+// INJECT DOM RECORDER INTO WEB PAGES //
+// Only inject into external web pages, not Flow's internal pages
+const isExternalWebPage =
+  !location.protocol.startsWith("flow:") &&
+  !location.protocol.startsWith("flow-internal:") &&
+  (location.protocol === "http:" || location.protocol === "https:");
+
+if (isExternalWebPage) {
+  // Inject the DOM recorder script into the page context
+  const script = document.createElement("script");
+  script.textContent = `
+  (function() {
+    if (typeof window === "undefined" || !window.flow?.recording) return;
+
+    const flow = window.flow;
+    let isRecording = false;
+    let checkInterval = null;
+
+    function generateSelector(element) {
+      if (element.id) return "#" + element.id;
+      const path = [];
+      let current = element;
+      while (current && current !== document.body && path.length < 5) {
+        let selector = current.tagName.toLowerCase();
+        if (current.classList.length > 0) {
+          const classes = Array.from(current.classList).slice(0, 2).map(c => "." + c).join("");
+          selector += classes;
+        }
+        path.unshift(selector);
+        current = current.parentElement;
+      }
+      return path.join(" > ");
+    }
+
+    function getElementText(element) {
+      const text = element.textContent?.trim();
+      if (!text || text.length === 0) return undefined;
+      return text.length > 50 ? text.substring(0, 47) + "..." : text;
+    }
+
+    function handleClick(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      flow.recording.captureEvent({
+        type: "click",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase(),
+        innerText: getElementText(target)
+      });
+    }
+
+    function handleInput(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      flow.recording.captureEvent({
+        type: "input",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase(),
+        value: target.value
+      });
+    }
+
+    function handleSubmit(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      flow.recording.captureEvent({
+        type: "submit",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase()
+      });
+    }
+
+    let scrollTimeout = null;
+    function handleScroll() {
+      if (!isRecording) return;
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        flow.recording.captureEvent({
+          type: "scroll",
+          url: window.location.href,
+          tabId: 0,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY
+        });
+      }, 500);
+    }
+
+    async function checkRecordingState() {
+      try {
+        const recording = await flow.recording.isRecording();
+        if (recording !== isRecording) {
+          isRecording = recording;
+          console.log("[DOMRecorder] Recording:", isRecording);
+        }
+      } catch (error) {
+        console.error("[DOMRecorder] Error:", error);
+      }
+    }
+
+    document.addEventListener("click", handleClick, true);
+    document.addEventListener("input", handleInput, true);
+    document.addEventListener("submit", handleSubmit, true);
+    window.addEventListener("scroll", handleScroll, true);
+    checkInterval = setInterval(checkRecordingState, 2000);
+    checkRecordingState();
+  })();
+  `;
+
+  if (document.head) {
+    document.head.appendChild(script);
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.head.appendChild(script);
+    });
+  }
+}

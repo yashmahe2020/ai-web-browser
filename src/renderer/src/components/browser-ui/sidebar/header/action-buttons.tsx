@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/resizable-sidebar";
 import { NavigationEntry } from "~/flow/interfaces/browser/navigation";
 import { cn } from "@/lib/utils";
-import { SidebarCloseIcon, SidebarOpenIcon, XIcon, CircleIcon, CircleDotIcon } from "lucide-react";
+import { SidebarCloseIcon, SidebarOpenIcon, XIcon, CircleIcon, CircleDotIcon, ListIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { ComponentProps, useCallback, useEffect, useRef, useState } from "react";
 import { TabData } from "~/types/tabs";
 import { SidebarVariant } from "../../main";
 import { useRecording } from "@/components/providers/recording-provider";
+import { RecordingViewer } from "@/components/recording/recording-viewer";
 
 export type NavigationEntryWithIndex = NavigationEntry & { index: number };
 
@@ -97,7 +98,8 @@ function StopLoadingIcon() {
 }
 
 function RecordButton() {
-  const { isRecording, toggleRecording } = useRecording();
+  const { isRecording, toggleRecording, eventCount } = useRecording();
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const RecordIcon = isRecording ? CircleDotIcon : CircleIcon;
   const iconClassName = cn(
@@ -106,12 +108,23 @@ function RecordButton() {
   );
 
   return (
-    <SidebarActionButton
-      icon={<RecordIcon className={iconClassName} />}
-      onClick={toggleRecording}
-      className={cn(SIDEBAR_HOVER_COLOR, isRecording && "bg-red-500/10 dark:bg-red-500/20")}
-      title={isRecording ? "Stop Recording" : "Start Recording"}
-    />
+    <>
+      <SidebarActionButton
+        icon={<RecordIcon className={iconClassName} />}
+        onClick={toggleRecording}
+        className={cn(SIDEBAR_HOVER_COLOR, isRecording && "bg-red-500/10 dark:bg-red-500/20")}
+        title={isRecording ? "Stop Recording" : "Start Recording"}
+      />
+      {eventCount > 0 && (
+        <SidebarActionButton
+          icon={<ListIcon className="w-4 h-4" />}
+          onClick={() => setViewerOpen(true)}
+          className={SIDEBAR_HOVER_COLOR}
+          title={`View ${eventCount} recorded events`}
+        />
+      )}
+      <RecordingViewer isOpen={viewerOpen} onClose={() => setViewerOpen(false)} />
+    </>
   );
 }
 

@@ -1,11 +1,17 @@
-import type { RecordingEvent, RecordingState } from "@/types/recording";
+import type { RecordedEvent, RecordingState, RecordingSession } from "~/types/recording";
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 export class Recorder {
   private state: RecordingState = {
     isRecording: false,
-    events: []
+    events: [],
+    sessionStartTime: undefined
   };
 
+  private sessionId: string | null = null;
   private listeners: Set<() => void> = new Set();
 
   getState(): RecordingState {
@@ -16,18 +22,29 @@ export class Recorder {
     return this.state.isRecording;
   }
 
+  getEvents(): RecordedEvent[] {
+    return [...this.state.events];
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
+  }
+
   startRecording(): void {
+    const now = Date.now();
+    this.sessionId = generateId();
     this.state = {
       isRecording: true,
-      events: [] // Clear previous events for fresh session
+      events: [], // Clear previous events for fresh session
+      sessionStartTime: now
     };
-    console.log("[Recorder] Recording started");
+    console.log("[Recorder] Recording started - Session:", this.sessionId);
     this.notifyListeners();
   }
 
   stopRecording(): void {
     this.state.isRecording = false;
-    console.log("[Recorder] Recording stopped. Captured events:", this.state.events);
+    console.log("[Recorder] Recording stopped. Captured events:", this.state.events.length);
     this.notifyListeners();
   }
 
@@ -39,17 +56,40 @@ export class Recorder {
     }
   }
 
-  addEvent(event: Omit<RecordingEvent, "timestamp">): void {
+  addEvent(event: Omit<RecordedEvent, "timestamp" | "id">): void {
     if (!this.state.isRecording) return;
 
-    const recordingEvent: RecordingEvent = {
-      ...event,
-      timestamp: Date.now()
+    const recordedEvent: RecordedEvent = {
+      id: generateId(),
+      timestamp: Date.now(),
+      ...event
     };
 
-    this.state.events.push(recordingEvent);
-    console.log("[Recorder] Event captured:", recordingEvent);
+    this.state.events.push(recordedEvent);
+    console.log("[Recorder] Event captured:", recordedEvent.type, recordedEvent.url);
     this.notifyListeners();
+  }
+
+  clearEvents(): void {
+    this.state.events = [];
+    this.notifyListeners();
+  }
+
+  exportSession(): RecordingSession | null {
+    if (!this.sessionId || !this.state.sessionStartTime) {
+      return null;
+    }
+
+    return {
+      id: this.sessionId,
+      startTime: this.state.sessionStartTime,
+      endTime: this.state.isRecording ? undefined : Date.now(),
+      events: [...this.state.events],
+      metadata: {
+        userAgent: navigator.userAgent,
+        flowVersion: "0.8.3" // TODO: Get from package.json or app context
+      }
+    };
   }
 
   subscribe(listener: () => void): () => void {

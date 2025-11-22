@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { recorder } from "@/lib/recording/recorder";
-import type { RecordingState } from "@/types/recording";
+import type { RecordingState, RecordedEvent } from "~/types/recording";
 
 interface RecordingContextValue {
   isRecording: boolean;
   eventCount: number;
   toggleRecording: () => void;
+  exportRecording: () => Promise<string | null>;
+  getEvents: () => RecordedEvent[];
 }
 
 const RecordingContext = createContext<RecordingContextValue | null>(null);
@@ -36,8 +38,36 @@ export const RecordingProvider = ({ children }: RecordingProviderProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    // Recording state changes are polled by content scripts via isRecording()
+    // No need to broadcast state changes explicitly
+  }, [state.isRecording]);
+
   const toggleRecording = () => {
     recorder.toggleRecording();
+  };
+
+  const exportRecording = async (): Promise<string | null> => {
+    const session = recorder.exportSession();
+    if (!session) {
+      console.error("[RecordingProvider] No active session to export");
+      return null;
+    }
+
+    const sessionJSON = JSON.stringify(session, null, 2);
+
+    // Call the IPC to export the recording
+    if (typeof window !== "undefined" && window.flow?.recording?.exportRecording) {
+      const filePath = await window.flow.recording.exportRecording(sessionJSON);
+      return filePath;
+    }
+
+    console.error("[RecordingProvider] flow.recording.exportRecording not available");
+    return null;
+  };
+
+  const getEvents = () => {
+    return recorder.getEvents();
   };
 
   return (
@@ -45,7 +75,9 @@ export const RecordingProvider = ({ children }: RecordingProviderProps) => {
       value={{
         isRecording: state.isRecording,
         eventCount: state.events.length,
-        toggleRecording
+        toggleRecording,
+        exportRecording,
+        getEvents
       }}
     >
       {children}

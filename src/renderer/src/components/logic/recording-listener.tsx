@@ -38,7 +38,7 @@ export function RecordingListener() {
     } else if (prevTab.url !== currentTab.url) {
       // URL changed (navigation within same tab)
       recorder.addEvent({
-        type: "navigation",
+        type: "navigate",
         url: currentTab.url,
         tabId: currentTab.id,
         title: focusedTab.title
