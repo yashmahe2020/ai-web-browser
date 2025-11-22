@@ -16,6 +16,8 @@ import MinimalToastProvider from "@/components/providers/minimal-toast-provider"
 import { AppUpdatesProvider } from "@/components/providers/app-updates-provider";
 import { ActionsProvider } from "@/components/providers/actions-provider";
 import { SidebarAddressBar } from "@/components/browser-ui/sidebar/header/address-bar/address-bar";
+import { RecordingProvider } from "@/components/providers/recording-provider";
+import { RecordingListener } from "@/components/logic/recording-listener";
 
 export type CollapseMode = "icon" | "offcanvas";
 export type SidebarVariant = "sidebar" | "floating";
@@ -79,6 +81,7 @@ function InternalBrowserUI({ isReady, type }: { isReady: boolean; type: WindowTy
   return (
     <MinimalToastProvider sidebarSide={side}>
       <ActionsProvider>
+        <RecordingListener />
         {dynamicTitle && <title>{`${dynamicTitle} | Flow`}</title>}
         {/* Sidebar on Left Side */}
         {hasSidebar && side === "left" && sidebar}
@@ -172,13 +175,15 @@ export function BrowserUI({ type }: { type: WindowType }) {
         <SettingsProvider>
           <SpacesProvider windowType={type}>
             <TabsProvider>
-              <BrowserActionProvider>
-                <ExtensionsProviderWithSpaces>
-                  <AppUpdatesProvider>
-                    <InternalBrowserUI isReady={isReady} type={type} />
-                  </AppUpdatesProvider>
-                </ExtensionsProviderWithSpaces>
-              </BrowserActionProvider>
+              <RecordingProvider>
+                <BrowserActionProvider>
+                  <ExtensionsProviderWithSpaces>
+                    <AppUpdatesProvider>
+                      <InternalBrowserUI isReady={isReady} type={type} />
+                    </AppUpdatesProvider>
+                  </ExtensionsProviderWithSpaces>
+                </BrowserActionProvider>
+              </RecordingProvider>
             </TabsProvider>
           </SpacesProvider>
         </SettingsProvider>

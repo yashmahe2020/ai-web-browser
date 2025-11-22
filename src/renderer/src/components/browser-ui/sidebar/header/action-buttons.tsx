@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/resizable-sidebar";
 import { NavigationEntry } from "~/flow/interfaces/browser/navigation";
 import { cn } from "@/lib/utils";
-import { SidebarCloseIcon, SidebarOpenIcon, XIcon } from "lucide-react";
+import { SidebarCloseIcon, SidebarOpenIcon, XIcon, CircleIcon, CircleDotIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { ComponentProps, useCallback, useEffect, useRef, useState } from "react";
 import { TabData } from "~/types/tabs";
 import { SidebarVariant } from "../../main";
+import { useRecording } from "@/components/providers/recording-provider";
 
 export type NavigationEntryWithIndex = NavigationEntry & { index: number };
 
@@ -92,6 +93,25 @@ function StopLoadingIcon() {
     >
       <XIcon className="w-4 h-4" />
     </motion.div>
+  );
+}
+
+function RecordButton() {
+  const { isRecording, toggleRecording } = useRecording();
+
+  const RecordIcon = isRecording ? CircleDotIcon : CircleIcon;
+  const iconClassName = cn(
+    "w-4 h-4",
+    isRecording && "fill-red-500 text-red-500"
+  );
+
+  return (
+    <SidebarActionButton
+      icon={<RecordIcon className={iconClassName} />}
+      onClick={toggleRecording}
+      className={cn(SIDEBAR_HOVER_COLOR, isRecording && "bg-red-500/10 dark:bg-red-500/20")}
+      title={isRecording ? "Stop Recording" : "Start Recording"}
+    />
   );
 }
 
@@ -196,6 +216,7 @@ export function NavigationControls({
               />
             )}
           </AnimatePresence>
+          <RecordButton />
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
