@@ -27,6 +27,12 @@ export interface FlowRecordingAPI {
    * Listen for DOM events captured from content scripts
    */
   onEventCaptured: (callback: (event: Omit<RecordedEvent, "id" | "timestamp">) => void) => () => void;
+
+  /**
+   * Notify the main process that recording state has changed
+   * @param isRecording - Whether recording is now active
+   */
+  setRecordingState: (isRecording: boolean) => void;
 }
 
 declare global {

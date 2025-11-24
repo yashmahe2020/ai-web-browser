@@ -8,6 +8,8 @@ import { ipcMain, WebContents } from "electron";
 type ListenerMap = Map<string, [WebContents, () => void]>;
 
 const listeners = new Map<string, ListenerMap>();
+// Track destroyed listeners per WebContents to avoid MaxListenersExceededWarning
+const webContentsDestroyedListeners = new Map<WebContents, () => void>();
 
 // Utility Functions //
 function getConnectedWebContents(channel: string) {
@@ -64,15 +66,35 @@ export function sendMessageToListenersWithWebContents(
 function addListener(channel: string, listenerId: string, webContents: WebContents) {
   const channelListeners: ListenerMap = listeners.get(channel) || new Map();
 
-  const onDestroyed = () => {
-    removeListener(channel, listenerId);
-  };
-  webContents.on("destroyed", onDestroyed);
+  // Set max listeners to prevent warning (we may have many listeners per WebContents)
+  if (webContents.listenerCount("destroyed") === 0) {
+    webContents.setMaxListeners(100);
+  }
+
+  // Use a single destroyed listener per WebContents to avoid MaxListenersExceededWarning
+  if (!webContentsDestroyedListeners.has(webContents)) {
+    const onDestroyed = () => {
+      // Clean up all listeners for this WebContents
+      for (const [ch, channelListenersMap] of listeners.entries()) {
+        for (const [lid, [wc, cleanup]] of channelListenersMap.entries()) {
+          if (wc === webContents) {
+            cleanup();
+            channelListenersMap.delete(lid);
+          }
+        }
+        if (channelListenersMap.size === 0) {
+          listeners.delete(ch);
+        }
+      }
+      webContentsDestroyedListeners.delete(webContents);
+    };
+    webContents.on("destroyed", onDestroyed);
+    webContentsDestroyedListeners.set(webContents, onDestroyed);
+  }
 
   const removeCallback = () => {
-    if (!webContents.isDestroyed()) {
-      webContents.off("destroyed", onDestroyed);
-    }
+    // Individual cleanup - the destroyed listener will handle bulk cleanup
+    // This is kept for manual removal via listeners:remove
   };
 
   channelListeners.set(listenerId, [webContents, removeCallback]);
@@ -85,10 +107,31 @@ function removeListener(channel: string, listenerId: string) {
 
   const data = channelListeners.get(listenerId);
   if (data) {
-    const [, removeCallback] = data;
+    const [webContents, removeCallback] = data;
     removeCallback();
     channelListeners.delete(listenerId);
-    listeners.set(channel, channelListeners);
+    
+    // If this was the last listener for this channel, clean up
+    if (channelListeners.size === 0) {
+      listeners.delete(channel);
+    } else {
+      listeners.set(channel, channelListeners);
+    }
+    
+    // Check if this WebContents has any remaining listeners
+    let hasRemainingListeners = false;
+    for (const chListeners of listeners.values()) {
+      for (const [, [wc]] of chListeners.entries()) {
+        if (wc === webContents) {
+          hasRemainingListeners = true;
+          break;
+        }
+      }
+      if (hasRemainingListeners) break;
+    }
+    
+    // If no remaining listeners, we could remove the destroyed listener,
+    // but it's safer to keep it in case new listeners are added
   }
 }
 

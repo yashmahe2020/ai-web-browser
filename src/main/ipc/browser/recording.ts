@@ -1,19 +1,45 @@
 import { ipcMain, app } from "electron";
 import fs from "fs/promises";
 import path from "path";
-import { ListenersManager } from "@/ipc/listeners-manager";
+import { sendMessageToListeners } from "@/ipc/listeners-manager";
+import { browserWindowsController } from "@/controllers/windows-controller/interfaces/browser";
 
-const listenersManager = new ListenersManager();
-
-// Store recording state per window
+// Store recording state per browser window (keyed by browser window's main webContents ID)
 const recordingState = new Map<number, boolean>();
+// Track which webContents have cleanup listeners to avoid duplicates
+const webContentsCleanupListeners = new Set<number>();
+
+// Helper function to set up cleanup listener for a webContents
+function setupCleanupListener(webContentsId: number, webContents: Electron.WebContents) {
+  if (webContentsCleanupListeners.has(webContentsId)) {
+    return; // Already has cleanup listener
+  }
+  
+  webContentsCleanupListeners.add(webContentsId);
+  webContents.once("destroyed", () => {
+    recordingState.delete(webContentsId);
+    webContentsCleanupListeners.delete(webContentsId);
+  });
+}
 
 ipcMain.handle("recording:is-recording", async (event) => {
-  const webContentsId = event.sender.id;
-  return recordingState.get(webContentsId) ?? false;
+  const senderWebContents = event.sender;
+  
+  // Find the browser window that contains this webContents (could be a content script)
+  const window = browserWindowsController.getWindowFromWebContents(senderWebContents);
+  if (!window) {
+    // If we can't find a window, return false
+    return false;
+  }
+  
+  // Get the browser window's main webContents ID (the renderer process)
+  const browserWebContentsId = window.browserWindow.webContents.id;
+  
+  // Return the recording state for this browser window
+  return recordingState.get(browserWebContentsId) ?? false;
 });
 
-ipcMain.handle("recording:export", async (event, sessionData: string) => {
+ipcMain.handle("recording:export", async (_event, sessionData: string) => {
   try {
     // Get the recordings directory in userData
     const userDataPath = app.getPath("userData");
@@ -39,29 +65,23 @@ ipcMain.handle("recording:export", async (event, sessionData: string) => {
 });
 
 ipcMain.on("recording:state-changed", (event, isRecording: boolean) => {
-  const webContentsId = event.sender.id;
+  const webContents = event.sender;
+  const webContentsId = webContents.id;
+  
   recordingState.set(webContentsId, isRecording);
+  
+  // Set up cleanup listener for this webContents if not already set up
+  setupCleanupListener(webContentsId, webContents);
 
-  // Notify all listeners in the same window
-  listenersManager.sendToWebContents(
-    webContentsId,
-    "recording:on-state-changed",
-    isRecording
-  );
+  // Notify all listeners (browser UI windows) that recording state changed
+  sendMessageToListeners("recording:on-state-changed", isRecording);
 });
 
 // Handle DOM events captured from content scripts
-ipcMain.on("recording:capture-event", (event, eventData) => {
-  // Forward the event to all browser UI windows
-  // The sender is the content script/web page, we need to forward to the browser UI
-  const webContentsId = event.sender.id;
-
-  // For now, just broadcast to the same webContents (the browser UI should be listening)
-  listenersManager.sendToWebContents(
-    webContentsId,
-    "recording:on-event-captured",
-    eventData
-  );
+ipcMain.on("recording:capture-event", (_event, eventData) => {
+  // Forward the event to all browser UI windows that are listening
+  // The sender is the content script/web page, we forward to the browser UI
+  sendMessageToListeners("recording:on-event-captured", eventData);
 });
 
 // Clean up state when window is closed

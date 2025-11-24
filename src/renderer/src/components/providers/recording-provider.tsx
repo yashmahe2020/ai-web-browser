@@ -28,13 +28,29 @@ export const RecordingProvider = ({ children }: RecordingProviderProps) => {
   const [state, setState] = useState<RecordingState>(recorder.getState());
 
   useEffect(() => {
+    // Send initial state to main process on mount
+    const initialState = recorder.getState();
+    if (typeof window !== "undefined" && window.flow?.recording?.setRecordingState) {
+      window.flow.recording.setRecordingState(initialState.isRecording);
+    }
+
     // Subscribe to recorder state changes
     const unsubscribe = recorder.subscribe(() => {
-      setState(recorder.getState());
+      const newState = recorder.getState();
+      setState(newState);
+      
+      // Notify main process of recording state change
+      if (typeof window !== "undefined" && window.flow?.recording?.setRecordingState) {
+        window.flow.recording.setRecordingState(newState.isRecording);
+      }
     });
 
     return () => {
       unsubscribe();
+      // Clean up recording state when provider unmounts (window closing)
+      if (typeof window !== "undefined" && window.flow?.recording?.setRecordingState) {
+        window.flow.recording.setRecordingState(false);
+      }
     };
   }, []);
 
