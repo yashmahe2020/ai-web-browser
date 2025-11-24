@@ -695,8 +695,167 @@ if (isExternalWebPage) {
       if (!isRecording) return;
       const target = event.target;
       if (!target) return;
-      flow.recording.captureEvent({
+      const eventData = {
         type: "click",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase(),
+        innerText: getElementText(target)
+      };
+      console.log(
+        "[Recording] CLICK captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", eventData.selector,
+        "\n  Text:", eventData.innerText || "(no text)",
+        "\n  URL:", eventData.url,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent(eventData);
+    }
+
+    function handleInput(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      const eventData = {
+        type: "input",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase(),
+        value: target.value
+      };
+      console.log(
+        "[Recording] INPUT captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", eventData.selector,
+        "\n  Value:", eventData.value ? ('"' + eventData.value.substring(0, 50) + (eventData.value.length > 50 ? '...' : '') + '"') : "(empty)",
+        "\n  Input type:", target.type || "text",
+        "\n  URL:", eventData.url,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent(eventData);
+    }
+
+    function handleSubmit(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      const eventData = {
+        type: "submit",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase()
+      };
+      console.log(
+        "[Recording] SUBMIT captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", eventData.selector,
+        "\n  Action:", target.action || "(no action)",
+        "\n  Method:", target.method || "GET",
+        "\n  URL:", eventData.url,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent(eventData);
+    }
+
+    let scrollTimeout = null;
+    function handleScroll() {
+      if (!isRecording) return;
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const eventData = {
+          type: "scroll",
+          url: window.location.href,
+          tabId: 0,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY
+        };
+        console.log(
+          "[Recording] SCROLL captured:",
+          "\n  Position: (", eventData.scrollX, ",", eventData.scrollY, ")",
+          "\n  URL:", eventData.url,
+          "\n  Timestamp:", new Date().toISOString()
+        );
+        flow.recording.captureEvent(eventData);
+      }, 500);
+    }
+
+    function handleCopy(event) {
+      if (!isRecording) return;
+      const selectedText = window.getSelection()?.toString();
+      if (!selectedText) return;
+      console.log(
+        "[Recording] COPY captured:",
+        "\n  Text:", selectedText.substring(0, 100) + (selectedText.length > 100 ? "..." : ""),
+        "\n  Length:", selectedText.length,
+        "\n  URL:", window.location.href,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "copy",
+        url: window.location.href,
+        tabId: 0,
+        value: selectedText.substring(0, 500)
+      });
+    }
+
+    function handlePaste(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      console.log(
+        "[Recording] PASTE captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", generateSelector(target),
+        "\n  URL:", window.location.href,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "paste",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase()
+      });
+    }
+
+    function handleContextMenu(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      console.log(
+        "[Recording] RIGHT-CLICK captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", generateSelector(target),
+        "\n  URL:", window.location.href,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "contextmenu",
+        url: window.location.href,
+        tabId: 0,
+        selector: generateSelector(target),
+        tagName: target.tagName.toLowerCase()
+      });
+    }
+
+    function handleDoubleClick(event) {
+      if (!isRecording) return;
+      const target = event.target;
+      if (!target) return;
+      console.log(
+        "[Recording] DOUBLE-CLICK captured:",
+        "\n  Element:", target.tagName,
+        "\n  Selector:", generateSelector(target),
+        "\n  Text:", getElementText(target) || "(no text)",
+        "\n  URL:", window.location.href,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "dblclick",
         url: window.location.href,
         tabId: 0,
         selector: generateSelector(target),
@@ -705,46 +864,90 @@ if (isExternalWebPage) {
       });
     }
 
-    function handleInput(event) {
+    function handleKeyDown(event) {
       if (!isRecording) return;
-      const target = event.target;
-      if (!target) return;
-      flow.recording.captureEvent({
-        type: "input",
-        url: window.location.href,
-        tabId: 0,
-        selector: generateSelector(target),
-        tagName: target.tagName.toLowerCase(),
-        value: target.value
-      });
-    }
 
-    function handleSubmit(event) {
-      if (!isRecording) return;
-      const target = event.target;
-      if (!target) return;
-      flow.recording.captureEvent({
-        type: "submit",
-        url: window.location.href,
-        tabId: 0,
-        selector: generateSelector(target),
-        tagName: target.tagName.toLowerCase()
-      });
-    }
-
-    let scrollTimeout = null;
-    function handleScroll() {
-      if (!isRecording) return;
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
+      // Capture keyboard shortcuts (Ctrl/Cmd + key combinations)
+      if (event.ctrlKey || event.metaKey) {
+        const key = event.key.toLowerCase();
+        const modifier = event.ctrlKey ? "Ctrl" : "Cmd";
+        console.log(
+          "[Recording] KEYBOARD SHORTCUT captured:",
+          "\n  Shortcut:", modifier + "+" + key,
+          "\n  Target:", event.target?.tagName || "window",
+          "\n  URL:", window.location.href,
+          "\n  Timestamp:", new Date().toISOString()
+        );
         flow.recording.captureEvent({
-          type: "scroll",
+          type: "keydown",
           url: window.location.href,
           tabId: 0,
-          scrollX: window.scrollX,
-          scrollY: window.scrollY
+          value: modifier + "+" + key,
+          selector: event.target ? generateSelector(event.target) : undefined,
+          tagName: event.target?.tagName.toLowerCase()
         });
-      }, 500);
+      }
+    }
+
+    function handleSelectionChange() {
+      if (!isRecording) return;
+      const selection = window.getSelection();
+      const selectedText = selection?.toString();
+      if (selectedText && selectedText.length > 0) {
+        console.log(
+          "[Recording] TEXT SELECTION captured:",
+          "\n  Text:", selectedText.substring(0, 100) + (selectedText.length > 100 ? "..." : ""),
+          "\n  Length:", selectedText.length,
+          "\n  URL:", window.location.href,
+          "\n  Timestamp:", new Date().toISOString()
+        );
+        // Only log selections longer than 3 characters to avoid noise
+        if (selectedText.length > 3) {
+          flow.recording.captureEvent({
+            type: "selection",
+            url: window.location.href,
+            tabId: 0,
+            value: selectedText.substring(0, 500)
+          });
+        }
+      }
+    }
+
+    // Debounce selection changes to avoid too many events
+    let selectionTimeout = null;
+    function handleSelectionChangeDebounced() {
+      if (selectionTimeout) clearTimeout(selectionTimeout);
+      selectionTimeout = setTimeout(handleSelectionChange, 500);
+    }
+
+    function handleHashChange(event) {
+      if (!isRecording) return;
+      console.log(
+        "[Recording] HASH CHANGE captured:",
+        "\n  Old URL:", event.oldURL,
+        "\n  New URL:", event.newURL,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "navigate",
+        url: window.location.href,
+        tabId: 0
+      });
+    }
+
+    function handlePopState(event) {
+      if (!isRecording) return;
+      console.log(
+        "[Recording] NAVIGATION (popstate) captured:",
+        "\n  URL:", window.location.href,
+        "\n  State:", event.state,
+        "\n  Timestamp:", new Date().toISOString()
+      );
+      flow.recording.captureEvent({
+        type: "navigate",
+        url: window.location.href,
+        tabId: 0
+      });
     }
 
     async function checkRecordingState() {
@@ -752,19 +955,32 @@ if (isExternalWebPage) {
         const recording = await flow.recording.isRecording();
         if (recording !== isRecording) {
           isRecording = recording;
-          console.log("[DOMRecorder] Recording:", isRecording);
+          console.log("[DOMRecorder] Recording state changed:", isRecording ? "STARTED" : "STOPPED");
         }
       } catch (error) {
-        console.error("[DOMRecorder] Error:", error);
+        console.error("[DOMRecorder] Error checking recording state:", error);
       }
     }
 
+    // Register all event listeners for comprehensive recording
     document.addEventListener("click", handleClick, true);
+    document.addEventListener("dblclick", handleDoubleClick, true);
+    document.addEventListener("contextmenu", handleContextMenu, true);
     document.addEventListener("input", handleInput, true);
     document.addEventListener("submit", handleSubmit, true);
+    document.addEventListener("copy", handleCopy, true);
+    document.addEventListener("paste", handlePaste, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("selectionchange", handleSelectionChangeDebounced);
     window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handlePopState);
+
+    // Check recording state periodically
     checkInterval = setInterval(checkRecordingState, 2000);
     checkRecordingState();
+
+    console.log("[DOMRecorder] Initialized - All event listeners registered");
   })();
   `;
 
