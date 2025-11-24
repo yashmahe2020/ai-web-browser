@@ -9,7 +9,10 @@ interface RecordingViewerProps {
 }
 
 export function RecordingViewer({ isOpen, onClose }: RecordingViewerProps) {
-  const { getEvents, exportRecording, isRecording, eventCount } = useRecording();
+  const { events, exportRecording, isRecording, eventCount } = useRecording();
+
+  // Debug logging to verify events are being retrieved
+  console.log("[RecordingViewer] Events:", events, "Count:", eventCount);
 
   const handleExport = async () => {
     const filePath = await exportRecording();
@@ -31,12 +34,24 @@ export function RecordingViewer({ isOpen, onClose }: RecordingViewerProps) {
         return "text-blue-400";
       case "click":
         return "text-green-400";
+      case "dblclick":
+        return "text-green-300";
+      case "contextmenu":
+        return "text-green-500";
       case "input":
         return "text-yellow-400";
       case "submit":
         return "text-purple-400";
       case "scroll":
         return "text-gray-400";
+      case "copy":
+        return "text-pink-400";
+      case "paste":
+        return "text-pink-300";
+      case "keydown":
+        return "text-indigo-400";
+      case "selection":
+        return "text-violet-400";
       case "tab_created":
         return "text-cyan-400";
       case "tab_switched":
@@ -96,7 +111,7 @@ export function RecordingViewer({ isOpen, onClose }: RecordingViewerProps) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {getEvents().map((event) => (
+                  {events.map((event) => (
                     <div
                       key={event.id}
                       className="bg-gray-800 rounded p-3 hover:bg-gray-750 transition-colors"

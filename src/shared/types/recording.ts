@@ -1,9 +1,15 @@
 export type RecordedEventType =
   | "navigate"
   | "click"
+  | "dblclick"
+  | "contextmenu"
   | "input"
   | "submit"
   | "scroll"
+  | "copy"
+  | "paste"
+  | "keydown"
+  | "selection"
   | "tab_created"
   | "tab_switched";
 

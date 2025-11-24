@@ -5,6 +5,7 @@ import type { RecordingState, RecordedEvent } from "~/types/recording";
 interface RecordingContextValue {
   isRecording: boolean;
   eventCount: number;
+  events: RecordedEvent[];
   toggleRecording: () => void;
   exportRecording: () => Promise<string | null>;
   getEvents: () => RecordedEvent[];
@@ -102,6 +103,7 @@ export const RecordingProvider = ({ children }: RecordingProviderProps) => {
       value={{
         isRecording: state.isRecording,
         eventCount: state.events.length,
+        events: state.events,
         toggleRecording,
         exportRecording,
         getEvents
